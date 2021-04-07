@@ -25,16 +25,20 @@ hotel_status = ['Да, в отеле \U0001F3E8', 'Нет \U0001F3E1', 'Зако
 time_statuses = ['Вариант 1 \U0001F556', 'Вариант 2 \U0001F550', 'Нет раннего выезда, позднего приезда',
                'Закончить диалог \U0001F3C3']
 hotel_docs = ['Ориг. счет и чек \U0001F34E', 'Копия счета и ориг. выписка из банка \U0001F34F',
-              'Ориг. подтв. прож-ия из отеля \U0001F351', 'Справка от CWT \U0001F352', 'Закончить диалог \U0001F3C3']
+              'Ориг. подтв. прож-ия из отеля \U0001F351', 'Копия счета и чека (AMEX оплата)',
+              'Справка от CWT \U0001F352', 'Закончить диалог \U0001F3C3']
 trasport_statuses = ['Да, одинаковый', 'Нет, разный', 'Закончить диалог \U0001F3C3']
 
 
-def text_print(dict_text_durty):
-    dict_text = list(set(dict_text_durty))
+def text_print(dict_text):
+    dict_text_check = []  # list to avoid double adding docs (ex. 'служебная записка')
     str_dict = f' - {dict_text[0]}'
+    dict_text_check.append(dict_text[0])
     if len(dict_text) > 1:
         for i in range(1, len(dict_text)):
-            str_dict += f',\n - {dict_text[i]}'
+            if dict_text[i] not in dict_text_check:
+                str_dict += f',\n - {dict_text[i]}'
+                dict_text_check.append(dict_text[i])
     return str_dict
 
 
@@ -417,12 +421,18 @@ async def get_flight_time_payment(message: types.Message, state: FSMContext):
         return
     if message.text == 'Да, хочу дополнительный день/дни':
         question_22 = f"\n\nВыберите ваш вариант : \n\nВариант 1. \U0001F556 \nУ вас по билетам вылет из аэропорта " \
-                       f"{Dict[message.from_user.id]['офис'][1]} ранее {Dict[message.from_user.id]['офис'][3]}/ " \
-                       f"прилет позднее {Dict[message.from_user.id]['офис'][2]}\nВариант 2. \U0001F550 \nУ вас ранний" \
-                       f" приезд в аэропорт/позднее возвращение домой, но по билетам вылет из аэропорта " \
-                       f"{Dict[message.from_user.id]['офис'][1]} позднее {Dict[message.from_user.id]['офис'][3]}/ " \
-                       f"прилет ранее {Dict[message.from_user.id]['офис'][2]}, но вы хотели бы дополнительный день " \
-                       f"суточных \n3. Ничего из вышеперечисленного \U0001F31E \n4. Закончить диалог \U0001F3C3"
+                      f"{Dict[message.from_user.id]['офис'][1]} ранее {Dict[message.from_user.id]['офис'][3]}/ " \
+                      f"прилет позднее {Dict[message.from_user.id]['офис'][2]}" \
+                      f"\n\U0001F6EB {Dict[message.from_user.id]['офис'][3]}---командировка---" \
+                      f"{Dict[message.from_user.id]['офис'][2]}\U0001F6EC" \
+                      f"\nВариант 2. \U0001F550 \nУ вас ранний" \
+                      f" приезд в аэропорт/позднее возвращение домой, но по билетам вылет из аэропорта " \
+                      f"{Dict[message.from_user.id]['офис'][1]} позднее {Dict[message.from_user.id]['офис'][3]}/ " \
+                      f"прилет ранее {Dict[message.from_user.id]['офис'][2]}, но вы хотели бы дополнительный день " \
+                      f"суточных " \
+                      f"\n{Dict[message.from_user.id]['офис'][3]}\U0001F6EB---командировка---\U0001F6EC" \
+                      f"{Dict[message.from_user.id]['офис'][2]}" \
+                      f"\n3. Ничего из вышеперечисленного \U0001F31E \n4. Закончить диалог \U0001F3C3"
         keyboard_22 = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)  # клавиатура
         for time_status in time_statuses:
             keyboard_22.add(types.KeyboardButton(time_status))
@@ -553,11 +563,11 @@ async def get_air_time(message: types.Message, state: FSMContext):
                              f"отличается от города в приказе."
                 await message.answer(question_3, reply_markup=keyboard_3)
                 await DocsStep.waiting_for_transport_spec.set()
-        elif message.text == "Закончить диалог \U0001F3C3":
-            await message.answer(f"Хорошего дня! \U0001F44B \n\nЧтобы повторить, напишите /start")
-            if message.from_user.id in Dict:
-                del Dict[message.from_user.id]
-            await DocsStep.other_state.set()
+    elif message.text == "Закончить диалог \U0001F3C3":
+        await message.answer(f"Хорошего дня! \U0001F44B \n\nЧтобы повторить, напишите /start")
+        if message.from_user.id in Dict:
+            del Dict[message.from_user.id]
+        await DocsStep.other_state.set()
 
 
 @dp.message_handler(state=DocsStep.waiting_for_train_ticket)
@@ -652,19 +662,17 @@ async def get_hotel(message: types.Message, state: FSMContext):
         keyboard_8 = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)# клавиатура
         for hotel_doc in hotel_docs:
             keyboard_8.add(types.KeyboardButton(hotel_doc))
-        question_8 = f"Последний вопрос \U00002705 и он про отель. Выберите 1 из 4 вариантов (1,2 - при " \
+        question_8 = f"Последний вопрос \U00002705 и он про отель. Выберите 1 из 5 вариантов (1,2 - при " \
                      f"самостоятельной оплате). У меня есть:"
         await message.answer(question_8, reply_markup=keyboard_8)
         await DocsStep.waiting_for_hotel_docs.set()
     elif message.text == 'Нет \U0001F3E1':
         Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'] = []
-        Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].append('квитанция/чек'
-                                                                                                    '/выписка из банка, '
-                                                                                                    'маршрут')
+        Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].\
+            append(f'квитанция/чек/выписка из банка, маршрут')
         Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'] = []
-        Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].append('подтверждение '
-                                                                                                    'оплаты и '
-                                                                                                    'детализация')
+        Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].\
+            append('подтверждение оплаты и детализация')
         await message.answer(f"Список документов, который нужно предоставить в финансовый отдел "
                                                f"\U0001F463:\n\n{text_print(Dict[message.from_user.id]['документы'])}"
                                                f"\n\n\U00002757Внимание!\U00002757 \n\nНе забудь:"
@@ -692,59 +700,52 @@ async def get_hotel_docs(message: types.Message, state: FSMContext):
         await message.reply('Пожалуйста, выберете вариант из списка под клавиатурой.')
         return
     if message.text == 'Ориг. счет и чек \U0001F34E' \
-            or message.text == 'Копия счета и ориг. выписка из банка \U0001F34F' \
-            or message.text == 'Ориг. подтв. прож-ия из отеля \U0001F351' \
-            or message.text == 'Справка от CWT \U0001F352':
+        or message.text == 'Копия счета и ориг. выписка из банка \U0001F34F' \
+        or message.text == 'Ориг. подтв. прож-ия из отеля \U0001F351' \
+        or message.text == 'Справка от CWT \U0001F352' \
+        or message.text == 'Копия счета и чека (AMEX оплата)':
+
+        additional_comment_AMEX = ''
+
         if message.text == 'Ориг. счет и чек \U0001F34E':
             Dict[message.from_user.id]['документы'].append('оригинальные счет и чек из отеля')
             Dict[message.from_user.id]['тип расходов']['суточные'].append('счет и чек из отеля')
             Dict[message.from_user.id]['тип расходов']['расход на отель'] = []
             Dict[message.from_user.id]['тип расходов']['расход на отель'].append('счет и чек из отеля')
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'] = []
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].append('квитанция/чек'
-                                                                                                        '/выписка из '
-                                                                                                        'банка, маршрут')
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'] = []
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].append('подтверждение '
-                                                                                                        'оплаты и '
-                                                                                                        'детализация')
+
+        elif message.text == 'Копия счета и чека (AMEX оплата)':
+            Dict[message.from_user.id]['документы'].append('копия счета и чека из отеля (AMEX)')
+            Dict[message.from_user.id]['тип расходов']['суточные'].\
+                append('копия счета и чека из отеля (AMEX)')
+            Dict[message.from_user.id]['тип расходов']['расход на отель (AMEX)'] = []
+            Dict[message.from_user.id]['тип расходов']['расход на отель (AMEX)'].append('счет и чек из отеля')
+
+            additional_comment_AMEX = f"\n4. Положи в пиджен AMEX/передай в московский офис с пометкой AMEX" \
+                                      f" оригиналы документов на расходы AMEX, включая отель, такси и т.п. " \
+                                      f"Не забудь сделать сканы для MyTE."
+
         elif message.text == 'Копия счета и ориг. выписка из банка \U0001F34F':
             Dict[message.from_user.id]['документы'].append(
                 'копия счета и выписка из оригинальная выписка из банка за отель')
             Dict[message.from_user.id]['тип расходов']['суточные'].append('счет из отеля')
             Dict[message.from_user.id]['тип расходов']['расход на отель'] = []
-            Dict[message.from_user.id]['тип расходов']['расход на отель'].append('счет из отеля и выписку из банка '
-                                                                                 'на оплату')
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'] = []
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].append('квитанция/чек'
-                                                                                                        '/выписка из '
-                                                                                                        'банка, маршрут')
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'] = []
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].append('подтверждение '
-                                                                                                        'оплаты и '
-                                                                                                        'детализация')
+            Dict[message.from_user.id]['тип расходов']['расход на отель'].\
+                append('счет из отеля и выписку из банка на оплату')
+
         elif message.text == 'Ориг. подтв. прож-ия из отеля \U0001F351':
             Dict[message.from_user.id]['документы'].append('оригинальная справка из отеля')
             Dict[message.from_user.id]['тип расходов']['суточные'].append('справка из отеля')
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'] = []
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].append('квитанция/чек'
-                                                                                                        '/выписка из '
-                                                                                                        'банка, маршрут')
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'] = []
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].append('подтверждение '
-                                                                                                        'оплаты и '
-                                                                                                        'детализация')
+
         elif message.text == 'Справка от CWT \U0001F352':
             Dict[message.from_user.id]['документы'].append('справка, подтверждающая проживание в отеле, от CWT')
             Dict[message.from_user.id]['тип расходов']['суточные'].append('справка на проживание от CWT')
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'] = []
-            Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].append('квитанция/чек'
-                                                                                                        '/выписка из '
-                                                                                                        'банка, маршрут')
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'] = []
-            Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].append('подтверждение '
-                                                                                                        'оплаты и '
-                                                                                                        'детализация')
+
+        Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'] = []
+        Dict[message.from_user.id]['тип расходов']['* расходы на такси/каршеринг'].\
+            append('квитанция/чек/выписка из банка, маршрут')
+        Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'] = []
+        Dict[message.from_user.id]['тип расходов']['* прочие согласованные расходы'].\
+            append('подтверждение оплаты и детализация')
         await message.answer(f"Список документов, который нужно предоставить в финансовый отдел "
                                                f"\U0001F463:\n\n{text_print(Dict[message.from_user.id]['документы'])}"
                                                f"\n\n\U00002757Внимание!\U00002757 \n\nНе забудь:"
@@ -753,6 +754,7 @@ async def get_hotel_docs(message: types.Message, state: FSMContext):
                                                f"\n2. Сдать оригинал приказа/-ов и согласие на вылет (если было) в HR \U0001F64C"
                                                f"\n3. Отразить в MyTE следующие расходы: "
                                                f"\n{myte_print(Dict[message.from_user.id]['тип расходов'])}"
+                                               f"{additional_comment_AMEX}"
                                                f"\n\n Чтобы повторить, напишите /start")
         if message.from_user.id in Dict:
             del Dict[message.from_user.id]
@@ -777,4 +779,3 @@ async def other_message(msg: types.Message):
 
 if __name__ == '__main__':
     executor.start_polling(dp)
-
